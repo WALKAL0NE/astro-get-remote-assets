@@ -6,6 +6,7 @@ import crypto from 'crypto';
 
 export default function getRemoteAssets(options = {}) {
   const { url = '', imageDir = './images' } = options;
+  const urls = Array.isArray(url) ? url : [url].filter(Boolean);
 
   return {
     name: 'astro-cms-image-plugin',
@@ -15,19 +16,15 @@ export default function getRemoteAssets(options = {}) {
         const imagesPath = path.join(outputDir, imageDir);
         const downloadedImages = new Map();
 
-        console.log('getRemoteAssets plugin: Starting image download process');
-        console.log('Target URL:', url);
-        console.log('Image directory:', imagesPath);
+        console.log(`🖼️  Downloading images from ${urls.length} source${urls.length > 1 ? 's' : ''}...`);
 
         // Create images directory if it doesn't exist
         await ensureDirectory(imagesPath);
 
         // Process HTML files
-        await processHtmlFiles(outputDir, url, imagesPath, downloadedImages);
+        await processHtmlFiles(outputDir, urls, imagesPath, downloadedImages);
 
-        console.log(
-          `getRemoteAssets plugin: Downloaded ${downloadedImages.size} images`,
-        );
+        console.log(`✅ Downloaded ${downloadedImages.size} images to ${imageDir}`);
       },
     },
   };
@@ -45,7 +42,7 @@ async function ensureDirectory(dirPath) {
 // Process all HTML files in the output directory
 async function processHtmlFiles(
   outputDir,
-  targetUrl,
+  targetUrls,
   imagesPath,
   downloadedImages,
 ) {
@@ -53,7 +50,7 @@ async function processHtmlFiles(
     const files = await getAllHtmlFiles(outputDir);
 
     for (const file of files) {
-      await processHtmlFile(file, targetUrl, imagesPath, downloadedImages);
+      await processHtmlFile(file, targetUrls, imagesPath, downloadedImages);
     }
   } catch (error) {
     console.error('Error processing HTML files:', error);
@@ -83,7 +80,7 @@ async function getAllHtmlFiles(dir, files = []) {
 // Process a single HTML file
 async function processHtmlFile(
   filePath,
-  targetUrl,
+  targetUrls,
   imagesPath,
   downloadedImages,
 ) {
@@ -91,72 +88,75 @@ async function processHtmlFile(
     let content = await fs.promises.readFile(filePath, 'utf8');
     let modified = false;
 
-    // Regular expression to find img and source tags with the target URL
-    const imgRegex = new RegExp(
-      `(<(?:img|source)[^>]*(?:src|srcset)=")(${targetUrl}[^"]+)([^>]*>)`,
-      'gi',
-    );
+    // Process each target URL
+    for (const targetUrl of targetUrls) {
+      // Regular expression to find img and source tags with the target URL
+      const imgRegex = new RegExp(
+        `(<(?:img|source)[^>]*(?:src|srcset)=")(${targetUrl}[^"]+)([^>]*>)`,
+        'gi',
+      );
 
-    // Process each match
-    const matches = [...content.matchAll(imgRegex)];
+      // Process each match
+      const matches = [...content.matchAll(imgRegex)];
 
-    for (const match of matches) {
-      const fullMatch = match[0];
-      const prefix = match[1];
-      const imageUrl = match[2];
-      const suffix = match[3];
+      for (const match of matches) {
+        const fullMatch = match[0];
+        const prefix = match[1];
+        const imageUrl = match[2];
+        const suffix = match[3];
 
-      // Download image if not already downloaded
-      let localPath;
-      if (downloadedImages.has(imageUrl)) {
-        localPath = downloadedImages.get(imageUrl);
-      } else {
-        localPath = await downloadImage(imageUrl, imagesPath);
+        // Download image if not already downloaded
+        let localPath;
+        if (downloadedImages.has(imageUrl)) {
+          localPath = downloadedImages.get(imageUrl);
+        } else {
+          localPath = await downloadImage(imageUrl, imagesPath);
+          if (localPath) {
+            downloadedImages.set(imageUrl, localPath);
+          }
+        }
+
+        // Replace URL with local path
         if (localPath) {
-          downloadedImages.set(imageUrl, localPath);
+          const relativePath = path.relative(path.dirname(filePath), localPath);
+          const newTag = `${prefix}${relativePath}${suffix}`;
+          content = content.replace(fullMatch, newTag);
+          modified = true;
         }
       }
 
-      // Replace URL with local path
-      if (localPath) {
-        const relativePath = path.relative(path.dirname(filePath), localPath);
-        const newTag = `${prefix}${relativePath}${suffix}`;
-        content = content.replace(fullMatch, newTag);
-        modified = true;
-      }
-    }
+      // Also handle srcset attributes
+      const srcsetRegex = new RegExp(
+        `(srcset="[^"]*)(${targetUrl}[^\s",]+)`,
+        'gi',
+      );
+      const srcsetMatches = [...content.matchAll(srcsetRegex)];
 
-    // Also handle srcset attributes
-    const srcsetRegex = new RegExp(
-      `(srcset="[^"]*)(${targetUrl}[^\s",]+)`,
-      'gi',
-    );
-    const srcsetMatches = [...content.matchAll(srcsetRegex)];
+      for (const match of srcsetMatches) {
+        const imageUrl = match[2];
 
-    for (const match of srcsetMatches) {
-      const imageUrl = match[2];
-
-      let localPath;
-      if (downloadedImages.has(imageUrl)) {
-        localPath = downloadedImages.get(imageUrl);
-      } else {
-        localPath = await downloadImage(imageUrl, imagesPath);
-        if (localPath) {
-          downloadedImages.set(imageUrl, localPath);
+        let localPath;
+        if (downloadedImages.has(imageUrl)) {
+          localPath = downloadedImages.get(imageUrl);
+        } else {
+          localPath = await downloadImage(imageUrl, imagesPath);
+          if (localPath) {
+            downloadedImages.set(imageUrl, localPath);
+          }
         }
-      }
 
-      if (localPath) {
-        const relativePath = path.relative(path.dirname(filePath), localPath);
-        content = content.replace(imageUrl, relativePath);
-        modified = true;
+        if (localPath) {
+          const relativePath = path.relative(path.dirname(filePath), localPath);
+          content = content.replace(imageUrl, relativePath);
+          modified = true;
+        }
       }
     }
 
     // Write modified content back to file
     if (modified) {
       await fs.promises.writeFile(filePath, content, 'utf8');
-      console.log(`Updated HTML: ${filePath}`);
+      // HTML file updated
     }
   } catch (error) {
     console.error(`Error processing HTML file ${filePath}:`, error);
@@ -258,7 +258,7 @@ function downloadWithTimeout(url, localPath, timeout = 30000) {
             isResolved = true;
             clearTimeout(timer);
             file.close();
-            console.log(`Downloaded: ${url} -> ${localPath}`);
+            // Image downloaded successfully
             resolve(localPath);
           }
         });

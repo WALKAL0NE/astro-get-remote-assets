@@ -1,11 +1,11 @@
-# astro-get-remote-assets
+# astro-get-remote-img
 
 An Astro integration that automatically downloads remote images from your CMS during the build process and updates HTML references to use local paths.
 
 ## Installation
 
 ```bash
-npm install astro-get-remote-assets
+npm install astro-get-remote-img
 ```
 
 ## Usage
@@ -14,7 +14,7 @@ Add the integration to your `astro.config.mjs`:
 
 ```js
 import { defineConfig } from 'astro/config';
-import getRemoteAssets from 'astro-get-remote-assets';
+import getRemoteAssets from 'astro-get-remote-img';
 
 export default defineConfig({
   integrations: [
@@ -24,11 +24,21 @@ export default defineConfig({
     }),
   ],
 });
+
+// Or with multiple URLs
+export default defineConfig({
+  integrations: [
+    getRemoteAssets({
+      url: ['https://images.microcms-assets.io', 'https://newt.io'],
+      imageDir: './images',
+    }),
+  ],
+});
 ```
 
 ## Configuration Options
 
-- `url` (string): The base URL of your CMS image server to match and download images from
+- `url` (string | string[]): The base URL(s) of your CMS image server to match and download images from. Can be a single URL or an array of URLs.
 - `imageDir` (string): The directory where downloaded images will be saved (default: `'./images'`)
 
 ## How it Works
