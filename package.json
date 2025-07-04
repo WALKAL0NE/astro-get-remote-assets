@@ -1,8 +1,8 @@
 {
   "name": "astro-get-remote-assets",
   "version": "1.0.0",
-  "description": "",
-  "main": "getImageFromCMS.js",
+  "description": "Astro integration to download remote assets from CMS and update HTML references during build",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -10,8 +10,8 @@
     "type": "git",
     "url": "git+https://github.com/WALKAL0NE/astro-get-remote-assets.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["astro", "astro-integration", "cms", "images", "assets", "download", "optimization"],
+  "author": "itoh yuki@frontartgraph.com",
   "license": "ISC",
   "type": "module",
   "bugs": {
