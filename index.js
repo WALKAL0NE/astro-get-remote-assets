@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import https from 'https';
 import crypto from 'crypto';
 
-export default function getImageFromCMS(options = {}) {
+export default function getRemoteAssets(options = {}) {
   const { url = '', imageDir = './images' } = options;
 
   return {
@@ -15,7 +15,7 @@ export default function getImageFromCMS(options = {}) {
         const imagesPath = path.join(outputDir, imageDir);
         const downloadedImages = new Map();
 
-        console.log('getImageFromCMS plugin: Starting image download process');
+        console.log('getRemoteAssets plugin: Starting image download process');
         console.log('Target URL:', url);
         console.log('Image directory:', imagesPath);
 
@@ -26,7 +26,7 @@ export default function getImageFromCMS(options = {}) {
         await processHtmlFiles(outputDir, url, imagesPath, downloadedImages);
 
         console.log(
-          `getImageFromCMS plugin: Downloaded ${downloadedImages.size} images`,
+          `getRemoteAssets plugin: Downloaded ${downloadedImages.size} images`,
         );
       },
     },
