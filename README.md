@@ -1,0 +1,1 @@
+# astro-get-remote-assets
